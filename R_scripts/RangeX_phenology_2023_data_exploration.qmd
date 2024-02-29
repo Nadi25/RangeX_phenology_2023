@@ -1,0 +1,254 @@
+---
+title: "RangeX_phenology_2023_data_exploration"
+author: "Nadine Arzt"
+format: html
+editor: visual
+date: 28.02.2024
+---
+
+## RangeX phenology 2023 data exploration
+
+### Library
+
+```{r}
+library(tidyr)
+library(ggplot2)
+
+## set theme for poster with bigger font size
+theme_set(theme_bw(base_size = 20))
+```
+
+### Import data set by sourcing the quarto file for cleaning
+
+```{r}
+#' @param file path to a quarto or Rmarkdown file
+source_qmd <- function(file){
+  tmp <- tempfile()
+  knitr::purl(input = file, output = tmp)
+  source(tmp)
+}
+
+
+source_qmd("RangeX_phenology_2023_data_cleaning.qmd")
+# phenology_clean <- readRDS("Data/RangeX_clean_phenology_2023.rds")
+```
+
+### First plot
+
+```{r}
+ggplot(data = rangex_phenology_clean, aes(date, number_buds, color = site, group = unique_plant_id))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(vars(species))
+```
+
+### Subset of Plantago
+
+```{r}
+## filter only plalan
+phenology_clean_plalan <- rangex_phenology_clean %>% 
+  dplyr::filter(rangex_phenology_clean$species == "plalan")
+
+## plot number of buds
+ggplot(data = phenology_clean_plalan, aes(date, number_buds, color = site, group = unique_plant_id))+
+  geom_point()+
+  geom_line()
+```
+
+#### Color by treatment
+
+```{r}
+ggplot(data = phenology_clean_plalan, aes(date, number_buds, color = treatment, group = unique_plant_id))+
+  geom_point()+
+  geom_line()
+```
+
+#### Buds, flowers and infructescences
+
+```{r}
+ggplot(data = phenology_clean_plalan, aes(date, color = treatment, group = unique_plant_id)) +
+  geom_point(aes(y = number_buds), size = 2) +
+  geom_line(aes(y = number_buds)) +
+  geom_point(aes(y = number_flowers), shape = 21, fill = "white", size = 2) +
+  geom_line(aes(y = number_flowers), linetype = "dashed") +
+  labs(y = "Number of Buds / Flowers")
+```
+
+#### Split by treatment
+
+```{r}
+ggplot(data = phenology_clean_plalan, aes(date)) +
+  geom_point(aes(y = number_buds, color = "Number of Buds"), size = 3) +
+  geom_point(aes(y = number_flowers, color = "Number of Flowers"), size = 3) +
+  geom_point(aes(y = number_infructescences, color = "Number of Infructescences"), size = 3) +
+  facet_wrap(~treatment) +
+  labs(y = "Mean number of buds / flowers / infructescences", x = "Date") +
+  scale_color_manual(values = c("lightblue", "darkred", "orange"),
+                     name = "Variables",
+                     labels = c("Number of buds", "Number of flowers", "Number of infructescences")) +
+  theme(legend.position = "top")
+
+## too many points in the plots
+```
+
+#### 
+
+```{r}
+ggplot(data = phenology_clean_plalan, aes(x = date)) +
+  geom_point(aes(y = number_buds, color = "Number of Buds"), size = 3) +
+  geom_errorbar(aes(ymin = number_buds - sd(number_buds), ymax = number_buds + sd(number_buds)), width = 0.1) +
+  geom_point(aes(y = number_flowers, color = "Number of Flowers"), size = 3) +
+  geom_errorbar(aes(ymin = number_flowers - sd(number_flowers), ymax = number_flowers + sd(number_flowers)), width = 0.1) +
+  geom_point(aes(y = number_infructescences, color = "Number of Infructescences"), size = 3) +
+  geom_errorbar(aes(ymin = number_infructescences - sd(number_infructescences), ymax = number_infructescences + sd(number_infructescences)), width = 0.1) +
+  facet_wrap(~treatment) +
+  labs(y = "Mean number of buds / flowers / infructescences", x = "Date") +
+  scale_color_manual(values = c("lightblue", "darkred", "orange"),
+                     name = "Variables",
+                     labels = c("Number of buds", "Number of flowers", "Number of infructescences")) +
+  theme(legend.position = "top")
+
+```
+
+#### Mean number of buds, flowers, infructescences
+
+Calculate a mean per species per treatment per date and the variance as well.
+
+```{r}
+# Calculating mean for buds, flowers, infructescences
+phenology_clean_plalan_mean_var <- phenology_clean_plalan %>%
+  group_by(species, date, treatment) %>%
+  summarise(
+    mean_number_buds = mean(number_buds, na.rm = TRUE),
+    mean_number_flowers = mean(number_flowers, na.rm = TRUE),
+    mean_number_infructescences = mean(number_infructescences, na.rm = TRUE),
+    sd_number_buds = sd(number_buds, na.rm = TRUE),
+    sd_number_flowers = sd(number_flowers, na.rm = TRUE),
+    sd_number_infructescences = sd(number_infructescences, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# Plotting
+ggplot(phenology_clean_plalan_mean_var, aes(x = date)) +
+  geom_pointrange(aes(y = mean_number_buds, ymin = mean_number_buds - sd_number_buds, ymax = mean_number_buds + sd_number_buds, color = "Number of Buds"), size = 1) +
+  geom_pointrange(aes(y = mean_number_flowers, ymin = mean_number_flowers - sd_number_flowers, ymax = mean_number_flowers + sd_number_flowers, color = "Number of Flowers"), size = 1) +
+  geom_pointrange(aes(y = mean_number_infructescences, ymin = mean_number_infructescences - sd_number_infructescences, ymax = mean_number_infructescences + sd_number_infructescences, color = "Number of Infructescences"), size = 1) +
+  facet_wrap(~treatment) +
+  labs(y = "Mean number of buds/flowers/infructescences", x = "") +
+  scale_color_manual(values = c("darkblue", "darkred", "darkorange"),
+                     name = "Variables",
+                     labels = c("Number of Buds", "Number of Flowers", "Number of Infructescences")) +
+  theme(legend.position = "top")
+
+```
+
+#### Use adjusted number of infructescences
+
+```{r}
+# Calculating mean for buds, flowers and adjusted number of infructescences
+phenology_clean_plalan_mean_var_adj <- phenology_clean_plalan %>%
+  group_by(species, date, treatment) %>%
+  summarise(
+    mean_number_buds = mean(number_buds, na.rm = TRUE),
+    mean_number_flowers = mean(number_flowers, na.rm = TRUE),
+    mean_number_infructescences = mean(number_infructescences_adj, na.rm = TRUE),
+    sd_number_buds = sd(number_buds, na.rm = TRUE),
+    sd_number_flowers = sd(number_flowers, na.rm = TRUE),
+    sd_number_infructescences = sd(number_infructescences_adj, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# Plotting
+ggplot(phenology_clean_plalan_mean_var_adj, aes(x = date)) +
+  geom_pointrange(aes(y = mean_number_buds, ymin = mean_number_buds - sd_number_buds, ymax = mean_number_buds + sd_number_buds, color = "Number of Buds"), size = 1) +
+  geom_pointrange(aes(y = mean_number_flowers, ymin = mean_number_flowers - sd_number_flowers, ymax = mean_number_flowers + sd_number_flowers, color = "Number of Flowers"), size = 1) +
+  geom_pointrange(aes(y = mean_number_infructescences, ymin = mean_number_infructescences - sd_number_infructescences, ymax = mean_number_infructescences + sd_number_infructescences, color = "Number of Infructescences"), size = 1) +
+  facet_wrap(~treatment) +
+  labs(y = "Mean number of buds/flowers/cumulated infructescences", x = "") +
+  scale_color_manual(values = c("darkblue", "darkred", "darkorange"),
+                     name = "Variables",
+                     labels = c("Number of Buds", "Number of Flowers", "Number of Infructescences")) +
+  theme(legend.position = "top")
+```
+
+### Subset of Leucanthemum
+
+```{r}
+## filter only leuvul
+phenology_clean_leuvul <- rangex_phenology_clean %>% 
+  dplyr::filter(rangex_phenology_clean$species == "leuvul")
+
+## plot number of buds
+ggplot(data = phenology_clean_leuvul, aes(date, number_buds, color = site, group = unique_plant_id))+
+  geom_point()+
+  geom_line()
+```
+
+#### Mean number of buds, flowers, infructescences
+
+```{r}
+phenology_clean_leuvul_mean_var <- phenology_clean_leuvul %>%
+  group_by(species, date, treatment) %>%
+  summarise(
+    mean_number_buds = mean(number_buds, na.rm = TRUE),
+    mean_number_flowers = mean(number_flowers, na.rm = TRUE),
+    mean_number_infructescences = mean(number_infructescences_adj, na.rm = TRUE),
+    sd_number_buds = sd(number_buds, na.rm = TRUE),
+    sd_number_flowers = sd(number_flowers, na.rm = TRUE),
+    sd_number_infructescences = sd(number_infructescences_adj, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# Plotting
+ggplot(phenology_clean_leuvul_mean_var, aes(x = date)) +
+  geom_pointrange(aes(y = mean_number_buds, ymin = mean_number_buds - sd_number_buds, ymax = mean_number_buds + sd_number_buds, color = "Number of Buds"), size = 1, alpha = 0.7, position = position_dodge(width = 0.2)) +
+  geom_pointrange(aes(y = mean_number_flowers, ymin = mean_number_flowers - sd_number_flowers, ymax = mean_number_flowers + sd_number_flowers, color = "Number of Flowers"), size = 1, alpha = 0.7, position = position_dodge(width = 0.5)) +
+  geom_pointrange(aes(y = mean_number_infructescences, ymin = mean_number_infructescences - sd_number_infructescences, ymax = mean_number_infructescences + sd_number_infructescences, color = "Number of Infructescences"), size = 1, alpha = 0.7, position = position_dodge(width = 0.8)) +
+  facet_wrap(~treatment) +
+  labs(y = "Mean number of buds/flowers/cum infructescences", x = "") +
+  scale_color_manual(values = c("darkblue", "darkred", "darkorange"),
+                     name = "Variables",
+                     labels = c("Number of Buds", "Number of Flowers", "Number of Infructescences")) +
+  theme(legend.position = "top")
+```
+
+### Subset of Trifolium
+
+```{r}
+## filter only tripra
+phenology_clean_tripra <- rangex_phenology_clean %>% 
+  dplyr::filter(rangex_phenology_clean$species == "tripra")
+
+## plot number of buds
+ggplot(data = phenology_clean_tripra, aes(date, number_buds, color = site, group = unique_plant_id))+
+  geom_point()+
+  geom_line()
+```
+
+#### Mean number of buds, flowers, infructescences
+
+```{r}
+phenology_clean_tripra_mean_var <- phenology_clean_tripra %>%
+  group_by(species, date, treatment) %>%
+  summarise(
+    mean_number_buds = mean(number_buds, na.rm = TRUE),
+    mean_number_flowers = mean(number_flowers, na.rm = TRUE),
+    mean_number_infructescences = mean(number_infructescences_adj, na.rm = TRUE),
+    sd_number_buds = sd(number_buds, na.rm = TRUE),
+    sd_number_flowers = sd(number_flowers, na.rm = TRUE),
+    sd_number_infructescences = sd(number_infructescences_adj, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# Plotting
+ggplot(phenology_clean_tripra_mean_var, aes(x = date)) +
+  geom_pointrange(aes(y = mean_number_buds, ymin = mean_number_buds - sd_number_buds, ymax = mean_number_buds + sd_number_buds, color = "Number of Buds"), size = 1, alpha = 0.7, position = position_dodge(width = 0.2)) +
+  geom_pointrange(aes(y = mean_number_flowers, ymin = mean_number_flowers - sd_number_flowers, ymax = mean_number_flowers + sd_number_flowers, color = "Number of Flowers"), size = 1, alpha = 0.7, position = position_dodge(width = 0.5)) +
+  geom_pointrange(aes(y = mean_number_infructescences, ymin = mean_number_infructescences - sd_number_infructescences, ymax = mean_number_infructescences + sd_number_infructescences, color = "Number of Infructescences"), size = 1, alpha = 0.7, position = position_dodge(width = 0.8)) +
+  facet_wrap(~treatment) +
+  labs(y = "Mean number of buds/flowers/cum infructescences", x = "") +
+  scale_color_manual(values = c("darkblue", "darkred", "darkorange"),
+                     name = "Variables",
+                     labels = c("Number of Buds", "Number of Flowers", "Number of Infructescences")) +
+  theme(legend.position = "top")
+```
