@@ -85,7 +85,7 @@ rangex_phenology_raw <- rangex_phenology_raw %>%
   mutate_at(vars(number_buds, number_flowers, number_infructescences, seeds_collected), ~replace(., is.na(.), 0))
 ```
 
-### Add metadata file for all countries
+### Import metadata file for all countries
 
 ```{r}
 ## can't load metadata as xlsx file, too many warnings and not loading correct
