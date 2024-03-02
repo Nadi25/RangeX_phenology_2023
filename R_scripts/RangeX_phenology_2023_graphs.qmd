@@ -7,13 +7,15 @@ editor: visual
 
 ### 
 
-## RangeX phenology 2023 data exploration
+## RangeX phenology 2023 plot buds, flowers, infructescences
 
 ### Library
 
 ```{r}
 library(tidyverse)
 library(conflicted)
+library(RColorBrewer)
+library(viridis)
 
 conflict_prefer_all("dplyr", quiet = TRUE)
 
@@ -104,6 +106,47 @@ phenology_clean_median_quant <- phenology_clean_median_quant |>
 
 ```
 
+### First plot with flowers of all species
+
+```{r}
+## filter only flowers
+phenology_clean_median_quant_flowers <- phenology_clean_median_quant |> 
+  filter(phenology_clean_median_quant$stage == "flowers")
+
+## filter only high site
+# phenology_clean_median_quant_flowers_hi <- phenology_clean_median_quant_flowers |> 
+#   filter(phenology_clean_median_quant_flowers$site == "high")
+
+## combine temperature and competition
+phenology_clean_median_quant_flowers <- phenology_clean_median_quant_flowers |> 
+  unite(treatment, site_treatment, competition, sep = " ", remove = FALSE)
+
+
+ggplot(phenology_clean_median_quant_flowers, aes(x = date)) +
+  geom_line(aes(y = median, color = treatment)) +
+  geom_ribbon(aes(y = median, ymin = lo, ymax = hi, fill = treatment), linewidth = 2, alpha = 0.4) +
+  facet_wrap(vars(species)) +  # Added `scales = "free"`
+  labs(y = "Median +/- quantiles", x = "", title = "") +
+  scale_color_manual(values = c("darkblue", "darkred", "darkorange", "grey", "green", "yellow")) +
+  scale_fill_manual(values = c("darkblue", "darkred", "darkorange", "grey", "green", "yellow")) +
+  theme(legend.position = "top")
+```
+
+Problem with cynci hi 7a f9 –\> was g9 in metadata file –\> needs to be changed in google docs
+
+```{r}
+flowers_colors <- brewer.pal(6, "Set3")
+
+## plot median of flower number for all species and all treatments
+ggplot(data = phenology_clean_median_quant_flowers, aes(date, color = treatment))+
+  geom_point(aes(y = median, color = treatment), size = 3)+
+  geom_line(aes(y = median, color = treatment))+
+  facet_wrap(vars(species), nrow = 2, ncol = 5)+
+  labs(y = "Median", x = "", title = "") +
+  theme(legend.position = "top")+
+  scale_color_manual(values = flowers_colors)
+```
+
 ### Filter per species
 
 #### Subset of Plantago
@@ -118,12 +161,31 @@ phenology_clean_median_quant_plalan <- phenology_clean_median_quant |>
 ##### Plot
 
 ```{r}
+# Convert site_treatment to a factor with correct order
+phenology_clean_median_quant_plalan$site_treatment <- factor(
+  phenology_clean_median_quant_plalan$site_treatment,
+  levels = c("high warmed", "high ambient", "low ambient")
+)
+
 ggplot(phenology_clean_median_quant_plalan, aes(x = date)) +
   geom_line(aes(y = median, color = stage)) +
-  geom_ribbon(aes(y = median, ymin = lo, ymax = hi, fill = stage), linewidth = 1, alpha = 0.5) +
+  geom_ribbon(aes(y = median, ymin = lo, ymax = hi, fill = stage), linewidth = 2, alpha = 0.4) +
   facet_grid(rows = vars(site_treatment), cols = vars(competition)) +  # Added `scales = "free"`
-  labs(y = "Median +/-quantiles", x = "", title = "Plantago lanceolata") +
+  labs(y = "Median +/- quantiles", x = "", title = "Plantago lanceolata") +
   scale_color_manual(values = c("darkblue", "darkred", "darkorange")) +
   scale_fill_manual(values = c("darkblue", "darkred", "darkorange")) +
+  theme(legend.position = "top")
+```
+
+##### Play with different colors
+
+```{r}
+ggplot(phenology_clean_median_quant_plalan, aes(x = date)) +
+  geom_line(aes(y = median, color = stage)) +
+  geom_ribbon(aes(y = median, ymin = lo, ymax = hi, fill = stage), linewidth = 2, alpha = 0.5) +
+  facet_grid(rows = vars(site_treatment), cols = vars(competition)) +  # Added `scales = "free"`
+  labs(y = "Median +/- quantiles", x = "", title = "Plantago lanceolata") +
+  scale_color_manual(values = c("turquoise3", "hotpink3", "orange1")) +
+  scale_fill_manual(values = c("turquoise3", "hotpink3", "orange1")) +
   theme(legend.position = "top")
 ```
