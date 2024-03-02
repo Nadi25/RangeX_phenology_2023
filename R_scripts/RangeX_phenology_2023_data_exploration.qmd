@@ -11,8 +11,7 @@ date: 28.02.2024
 ### Library
 
 ```{r}
-library(tidyr)
-library(ggplot2)
+library(tidyverse)
 
 ## set theme for poster with bigger font size
 theme_set(theme_bw(base_size = 20))
@@ -30,7 +29,7 @@ source_qmd <- function(file){
 
 
 source_qmd("RangeX_phenology_2023_data_cleaning.qmd")
-# phenology_clean <- readRDS("Data/RangeX_clean_phenology_2023.rds")
+
 ```
 
 ### First plot
@@ -64,17 +63,6 @@ ggplot(data = phenology_clean_plalan, aes(date, number_buds, color = treatment, 
 ```
 
 #### Buds, flowers and infructescences
-
-```{r}
-ggplot(data = phenology_clean_plalan, aes(date, color = treatment, group = unique_plant_id)) +
-  geom_point(aes(y = number_buds), size = 2) +
-  geom_line(aes(y = number_buds)) +
-  geom_point(aes(y = number_flowers), shape = 21, fill = "white", size = 2) +
-  geom_line(aes(y = number_flowers), linetype = "dashed") +
-  labs(y = "Number of Buds / Flowers")
-```
-
-#### Split by treatment
 
 ```{r}
 ggplot(data = phenology_clean_plalan, aes(date)) +
@@ -142,34 +130,7 @@ ggplot(phenology_clean_plalan_mean_var, aes(x = date)) +
 
 ```
 
-#### Use adjusted number of infructescences
-
-```{r}
-# Calculating mean for buds, flowers and adjusted number of infructescences
-phenology_clean_plalan_mean_var_adj <- phenology_clean_plalan %>%
-  group_by(species, date, treatment) %>%
-  summarise(
-    mean_number_buds = mean(number_buds, na.rm = TRUE),
-    mean_number_flowers = mean(number_flowers, na.rm = TRUE),
-    mean_number_infructescences = mean(number_infructescences_adj, na.rm = TRUE),
-    sd_number_buds = sd(number_buds, na.rm = TRUE),
-    sd_number_flowers = sd(number_flowers, na.rm = TRUE),
-    sd_number_infructescences = sd(number_infructescences_adj, na.rm = TRUE)
-  ) %>%
-  ungroup()
-
-# Plotting
-ggplot(phenology_clean_plalan_mean_var_adj, aes(x = date)) +
-  geom_pointrange(aes(y = mean_number_buds, ymin = mean_number_buds - sd_number_buds, ymax = mean_number_buds + sd_number_buds, color = "Number of Buds"), size = 1) +
-  geom_pointrange(aes(y = mean_number_flowers, ymin = mean_number_flowers - sd_number_flowers, ymax = mean_number_flowers + sd_number_flowers, color = "Number of Flowers"), size = 1) +
-  geom_pointrange(aes(y = mean_number_infructescences, ymin = mean_number_infructescences - sd_number_infructescences, ymax = mean_number_infructescences + sd_number_infructescences, color = "Number of Infructescences"), size = 1) +
-  facet_wrap(~treatment) +
-  labs(y = "Mean number of buds/flowers/cumulated infructescences", x = "") +
-  scale_color_manual(values = c("darkblue", "darkred", "darkorange"),
-                     name = "Variables",
-                     labels = c("Number of Buds", "Number of Flowers", "Number of Infructescences")) +
-  theme(legend.position = "top")
-```
+#### 
 
 ### Subset of Leucanthemum
 
@@ -252,3 +213,108 @@ ggplot(phenology_clean_tripra_mean_var, aes(x = date)) +
                      labels = c("Number of Buds", "Number of Flowers", "Number of Infructescences")) +
   theme(legend.position = "top")
 ```
+
+#### Plot the range instead of points
+
+```{r}
+ggplot(phenology_clean_tripra_mean_var, aes(x = date)) +
+  geom_line(aes(y = mean_number_buds, color = "Number of Buds"))  +
+  geom_ribbon(aes(ymin = mean_number_buds - sd_number_buds, ymax = mean_number_buds + sd_number_buds, fill = "blue"))+
+  facet_wrap(~treatment) +
+  labs(y = "Mean number of buds/flowers/cum infructescences", x = "") +
+  scale_color_manual(values = c("darkblue", "darkred", "darkorange"),
+                     name = "Variables",
+                     labels = c("Number of Buds", "Number of Flowers", "Number of Infructescences")) +
+  theme(legend.position = "top")
+
+## problem: it plots negative values, but in the table are no negative values
+```
+
+### Subset of Succisa
+
+```{r}
+## filter only sucpra
+phenology_clean_sucpra <- rangex_phenology_clean %>% 
+  dplyr::filter(rangex_phenology_clean$species == "sucpra")
+
+## plot number of buds
+ggplot(data = phenology_clean_sucpra, aes(date, number_buds, color = site, group = unique_plant_id))+
+  geom_point()+
+  geom_line()
+```
+
+#### Mean number of buds, flowers, infructescences
+
+```{r}
+phenology_clean_sucpra_mean_var <- phenology_clean_sucpra %>%
+  group_by(species, date, treatment) %>%
+  summarise(
+    mean_number_buds = mean(number_buds, na.rm = TRUE),
+    mean_number_flowers = mean(number_flowers, na.rm = TRUE),
+    mean_number_infructescences = mean(number_infructescences_adj, na.rm = TRUE),
+    sd_number_buds = sd(number_buds, na.rm = TRUE),
+    sd_number_flowers = sd(number_flowers, na.rm = TRUE),
+    sd_number_infructescences = sd(number_infructescences_adj, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# Plotting
+ggplot(phenology_clean_sucpra_mean_var, aes(x = date)) +
+  geom_pointrange(aes(y = mean_number_buds, ymin = mean_number_buds - sd_number_buds, ymax = mean_number_buds + sd_number_buds, color = "Number of Buds"), size = 1, alpha = 0.7, position = position_dodge(width = 0.2)) +
+  geom_pointrange(aes(y = mean_number_flowers, ymin = mean_number_flowers - sd_number_flowers, ymax = mean_number_flowers + sd_number_flowers, color = "Number of Flowers"), size = 1, alpha = 0.7, position = position_dodge(width = 0.5)) +
+  geom_pointrange(aes(y = mean_number_infructescences, ymin = mean_number_infructescences - sd_number_infructescences, ymax = mean_number_infructescences + sd_number_infructescences, color = "Number of Infructescences"), size = 1, alpha = 0.7, position = position_dodge(width = 0.8)) +
+  facet_wrap(~treatment) +
+  labs(y = "Mean number of buds/flowers/cum infructescences", x = "") +
+  scale_color_manual(values = c("darkblue", "darkred", "darkorange"),
+                     name = "Variables",
+                     labels = c("Number of Buds", "Number of Flowers", "Number of Infructescences")) +
+  theme(legend.position = "top")
+```
+
+## Pivot longer the data
+
+```{r}
+rangex_phenology_clean_long <- rangex_phenology_clean |> 
+  pivot_longer(cols = c(number_buds, number_flowers, number_infructescences_adj),
+               names_to = "stage",
+               values_to = "value")
+
+# View the resulting dataframe
+print(rangex_phenology_clean_long)
+```
+
+#### Filter Sucpra
+
+```{r}
+## filter only sucpra
+phenology_clean_long_sucpra <- rangex_phenology_clean_long %>% 
+  dplyr::filter(rangex_phenology_clean_long$species == "sucpra")
+
+```
+
+#### Calculate median and quantiles
+
+```{r}
+phenology_clean_sucpra_median_quant <- phenology_clean_long_sucpra |> 
+  group_by(species, date, treatment, stage) |> 
+  summarise(median = median(value),
+    lo = quantile(value, probs = 0.1, na.rm = TRUE), 
+    hi = quantile(value, probs = 0.9, na.rm = TRUE), 
+    .groups = "drop") 
+```
+
+#### Plot range with median, min, max
+
+```{r}
+ggplot(phenology_clean_sucpra_median_quant, aes(x = date)) +
+  geom_line(aes(y = median, color = stage)) +
+  geom_ribbon(aes(y = median, ymin = lo, ymax = hi, fill = stage), size = 1, alpha = 0.5) +
+  facet_wrap(~treatment) +
+  labs(y = "Median", x = "") +
+  scale_color_manual(values = c("darkblue", "darkred", "darkorange")) +
+  scale_fill_manual(values = c("darkblue", "darkred", "darkorange")) +
+  theme(legend.position = "top")
+
+```
+
+#### 

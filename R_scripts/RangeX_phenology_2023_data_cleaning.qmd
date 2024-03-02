@@ -71,6 +71,13 @@ rangex_phenology_raw <- rangex_phenology_raw %>%
          "position_id_original" = "position_id")
 ```
 
+### Change date format
+
+```{r}
+rangex_phenology_raw <- rangex_phenology_raw |> 
+  mutate(date = as.Date(date))
+```
+
 ### Replace NAs with 0
 
 ```{r}
@@ -131,6 +138,10 @@ colnames(rangex_phenology_raw)
 
     --\> Can we specify that when the last seed has been collected, the next date does not get more seeds added to the infructescences? Because then the plant is completely done
 
+4.  Sometimes we have several data points for e.g. buds very close, when not all plots have been observed at the same date
+
+    --\> create new date column with same date for one block of observations
+
 ### Fix seeds collected –\> clean data
 
 ```{r}
@@ -145,6 +156,71 @@ rangex_phenology_clean <- rangex_phenology_raw %>%
     number_infructescences_adj = number_infructescences + lag(cumsum_seeds_collected, default = 0)
   ) %>%
   ungroup()
+
+## rename number infructescences and delete old column
+rangex_phenology_clean <- rangex_phenology_clean %>%
+  rename("number_infructescences_old" = "number_infructescences",
+         "number_infructescences" = "number_infructescences_adj")
+
+## delete number_infructescences_old, cumsum_seeds_colleted
+rangex_phenology_clean <- rangex_phenology_clean |> 
+  select(-c(number_infructescences_old, cumsum_seeds_collected))
+```
+
+### Fix date
+
+```{r}
+## change date name to date_old
+rangex_phenology_clean <- rangex_phenology_clean %>%
+  rename("date_old" = "date")
+
+## count how many measurements per day to see which date needs fixing
+count <- count(rangex_phenology_clean,date_old, site)
+count
+
+## these dates need fixing
+## low site: 11.09 and 13.09 need to be together --> 13.09.2023
+## high site: 15./17./18./19.07 --> 18.07.2023
+## hi: 17./18.08 --> 18.08.2023
+## hi: 29./30.08 --> 29.08.2023
+
+rangex_phenology_clean <- rangex_phenology_clean |> 
+  mutate(date = case_when(
+    # For the low site where date is 2023-09-11, change it to 2023-09-13
+    site == "lo" & date_old == "2023-09-11" ~ as.Date("2023-09-13"),
+    # For the high site where date is 15./17./18./19.07, change it to 18.07.2023
+    site == "hi" & date_old %in% c("2023-07-15", "2023-07-17", "2023-07-19") ~ as.Date("2023-07-18"),
+    # For the high site where date is 17./18.08, change it to 18.08.2023
+    site == "hi" & date_old == "2023-08-17" ~ as.Date("2023-08-18"),
+    # For the high site where date is 29./30.08, change it to 29.08.2023
+    site == "hi" & date_old == "2023-08-30" ~ as.Date("2023-08-29"),
+    # For all other cases, keep the original date
+    .default = date_old
+  ))
+
+count_new <- count(rangex_phenology_clean, date, site)
+count_new
+
+## delete date_old
+rangex_phenology_clean <- rangex_phenology_clean |> 
+  select(-date_old)
+
+```
+
+### Pivot longer the data
+
+```{r}
+rangex_phenology_clean_long <- rangex_phenology_clean |> 
+  pivot_longer(cols = c(number_buds, number_flowers, number_infructescences, seeds_collected),
+               names_to = "stage",
+               values_to = "value")
+
+# Arrange the dataframe if needed
+rangex_phenology_clean_long <- rangex_phenology_clean_long |> 
+  arrange(unique_plant_id, date)
+
+# View the resulting dataframe
+print(rangex_phenology_clean_long)
 
 ```
 
