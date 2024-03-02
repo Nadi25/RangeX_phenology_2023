@@ -1,0 +1,129 @@
+---
+title: "RangeX_phenology_2023_#buds_flowers_infructescences"
+author: "Nadine Arzt"
+format: html
+editor: visual
+---
+
+### 
+
+## RangeX phenology 2023 data exploration
+
+### Library
+
+```{r}
+library(tidyverse)
+library(conflicted)
+
+conflict_prefer_all("dplyr", quiet = TRUE)
+
+## set theme for poster with bigger font size
+theme_set(theme_bw(base_size = 20))
+```
+
+### Import data set by sourcing the quarto file for cleaning
+
+```{r}
+#' @param file path to a quarto or Rmarkdown file
+source_qmd <- function(file){
+  tmp <- tempfile()
+  knitr::purl(input = file, output = tmp)
+  source(tmp)
+}
+
+
+source_qmd("RangeX_phenology_2023_data_cleaning.qmd")
+```
+
+### Filter buds, flowers, infructescences
+
+```{r}
+## don't use seeds_collected
+phenology_clean <- rangex_phenology_clean_long |> 
+    filter(rangex_phenology_clean_long$stage != "seeds_collected")
+```
+
+### Calculate median and quantiles
+
+```{r}
+## calculate median of number of buds, flowers, infructescences
+## calculate quantiles (fits to median) instead of sd to avoid having negative values for mean-/+ sd. 
+## Negative ranges come when we have many low values and a few high ones
+phenology_clean_median_quant <- phenology_clean |> 
+  group_by(species, date, treatment, stage) |> 
+  summarise(median = median(value),
+    lo = quantile(value, probs = 0.1, na.rm = TRUE), 
+    hi = quantile(value, probs = 0.9, na.rm = TRUE), 
+    .groups = "drop")
+```
+
+### Rename treatment and stages
+
+```{r}
+## call number_buds buds ...
+phenology_clean_median_quant <- phenology_clean_median_quant |> 
+  mutate(stage = case_when(
+    stage == "number_buds" ~ "buds",
+    stage == "number_flowers" ~ "flowers",
+    stage == "number_infructescences" ~ "infructescences",
+    TRUE ~ as.character(stage)  # Keep other values as they are
+  ))
+
+## split column treatment
+phenology_clean_median_quant <- phenology_clean_median_quant |> 
+  separate(treatment, c("site", "temperature", "competition"))
+
+## rename site
+phenology_clean_median_quant <- phenology_clean_median_quant |> 
+  mutate(site = case_when(
+    site == "lo" ~ "low",
+    site == "hi" ~ "high",
+    TRUE ~ as.character(stage)  # Keep other values as they are
+  ))
+
+## rename vege = with competition
+## rename bare = without competition
+phenology_clean_median_quant <- phenology_clean_median_quant |> 
+  mutate(competition = case_when(
+    competition == "vege" ~ "with competition",
+    competition == "bare" ~ "without competition",
+    TRUE ~ as.character(stage)  # Keep other values as they are
+  ))
+
+## rename temperature
+phenology_clean_median_quant <- phenology_clean_median_quant |> 
+  mutate(temperature = case_when(
+    temperature == "ambi" ~ "ambient",
+    temperature == "warm" ~ "warmed",
+    TRUE ~ as.character(stage)  # Keep other values as they are
+  ))
+
+## combine temperature and competition
+phenology_clean_median_quant <- phenology_clean_median_quant |> 
+  unite(site_treatment, site, temperature, sep = " ", remove = FALSE)
+
+```
+
+### Filter per species
+
+#### Subset of Plantago
+
+```{r}
+## filter only plalan
+phenology_clean_median_quant_plalan <- phenology_clean_median_quant |> 
+  filter(phenology_clean_median_quant$species == "plalan")
+
+```
+
+##### Plot
+
+```{r}
+ggplot(phenology_clean_median_quant_plalan, aes(x = date)) +
+  geom_line(aes(y = median, color = stage)) +
+  geom_ribbon(aes(y = median, ymin = lo, ymax = hi, fill = stage), linewidth = 1, alpha = 0.5) +
+  facet_grid(rows = vars(site_treatment), cols = vars(competition)) +  # Added `scales = "free"`
+  labs(y = "Median +/-quantiles", x = "", title = "Plantago lanceolata") +
+  scale_color_manual(values = c("darkblue", "darkred", "darkorange")) +
+  scale_fill_manual(values = c("darkblue", "darkred", "darkorange")) +
+  theme(legend.position = "top")
+```
