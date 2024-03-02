@@ -142,7 +142,7 @@ colnames(rangex_phenology_raw)
 
     --\> create new date column with same date for one block of observations
 
-### Fix seeds collected –\> clean data
+#### Fix seeds collected
 
 ```{r}
 # Arrange the data by unique plant ID and date
@@ -167,7 +167,7 @@ rangex_phenology_clean <- rangex_phenology_clean |>
   select(-c(number_infructescences_old, cumsum_seeds_collected))
 ```
 
-### Fix date
+#### Fix date
 
 ```{r}
 ## change date name to date_old
@@ -207,23 +207,6 @@ rangex_phenology_clean <- rangex_phenology_clean |>
 
 ```
 
-### Pivot longer the data
-
-```{r}
-rangex_phenology_clean_long <- rangex_phenology_clean |> 
-  pivot_longer(cols = c(number_buds, number_flowers, number_infructescences, seeds_collected),
-               names_to = "stage",
-               values_to = "value")
-
-# Arrange the dataframe if needed
-rangex_phenology_clean_long <- rangex_phenology_clean_long |> 
-  arrange(unique_plant_id, date)
-
-# View the resulting dataframe
-print(rangex_phenology_clean_long)
-
-```
-
 ### Save clean file
 
 ```{r}
@@ -238,4 +221,139 @@ print(rangex_phenology_clean_long)
 # ## read cleaned data
 # rangex_raw_phenology <- read.csv(here("RangeX_raw_phenology_2023.csv"))
 # rangex_raw_phenology
+```
+
+### Fix Centaurea problem
+
+##### Import demographic traits low and high
+
+```{r}
+## import demographic traits data low
+rangex_raw_demographic_traits_lo <- read_xlsx(here("Data/RangeX_raw_demographic_traits_low_2023.xlsx"), sheet = 2)
+
+## import demographic traits data high
+rangex_raw_demographic_traits_hi <- read_xlsx(here("Data/RangeX_raw_demographic_traits_high_2023.xlsx"), sheet = 2)
+```
+
+##### Add column site and change block to numeric
+
+```{r}
+## lo: change block to numeric
+rangex_raw_demographic_traits_lo <- rangex_raw_demographic_traits_lo |> 
+  mutate(block = as.numeric(block))
+
+## add column with site
+rangex_raw_demographic_traits_lo <- rangex_raw_demographic_traits_lo |> 
+  mutate(site = "lo")
+
+rangex_raw_demographic_traits_hi <- rangex_raw_demographic_traits_hi |> 
+  mutate(site = "hi")
+```
+
+##### Combine low and high
+
+```{r}
+# combine low site and high site
+rangex_raw_demographic_traits <- bind_rows(rangex_raw_demographic_traits_lo, rangex_raw_demographic_traits_hi)
+```
+
+##### Rename columns to match with phenology
+
+```{r}
+rangex_raw_demographic_traits <- rangex_raw_demographic_traits |> 
+  rename("block_id_original" = "block",
+         "plot_id_original" = "treat",
+         "position_id_original" = "coord",
+         "date_traits" = "date",
+         "comment_traits" = "comment")
+```
+
+##### Delete unnecessary columns
+
+```{r}
+rangex_raw_demographic_traits <- rangex_raw_demographic_traits |> 
+  select(-c(height_veg_cm, height_nathan_cm, height_veg_stretch_cm, height_rep_cm, height_rep_strech_cm, leaf_length_mm, petiole_length_mm, leaf_width_mm, no_leaves, sampled_quarter, herbivory_flower,herbivory_leaf, nathan_old_new, tillers_yes_no))
+```
+
+##### Replace NAs with 0
+
+```{r}
+# Columns to exclude from replacing NAs with 0
+columns_to_exclude <- c("block_id_original", "plot_id_original", "species", "position_id_original", "date_traits", "observer", "scribe", "comment_traits", "site")
+
+# Replace NAs with 0 in all columns except the ones in columns_to_exclude
+rangex_raw_demographic_traits <- rangex_raw_demographic_traits %>%
+  mutate_at(vars(-all_of(columns_to_exclude)), ~replace(., is.na(.), 0))
+```
+
+##### Merge phenology with demographic traits
+
+```{r}
+## merge with phenology data set
+rangex_phenology_clean_demo_traits <- left_join(rangex_phenology_clean, rangex_raw_demographic_traits,
+                         by = c("site", "block_id_original", "plot_id_original", "position_id_original", "species"))
+```
+
+##### Calculate sum of number of flowers from no_flowers_col...
+
+```{r}
+rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits %>%
+  #group_by(unique_plant_id) %>%
+  mutate(sum_no_flowers = rowSums(select(., starts_with("no_flowers")), na.rm = TRUE))
+
+```
+
+##### Delete more unnecessary columns
+
+```{r}
+rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits |> 
+  select(-starts_with("no_flowers"), -date_traits, -observer, -scribe, -comment_traits)
+
+```
+
+##### Calculate number per flower
+
+```{r}
+## 
+rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits %>%
+  mutate(number_flowers_per_stem = sum_no_flowers / no_rep_stems)
+
+```
+
+##### Replace number_flowers with sum_no_flowers for cennig
+
+```{r}
+## rename column number of flowers to old
+rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits |> 
+  rename("number_flowers_old" = "number_flowers")
+
+## for cennig I want to have number_flowers_old (= no_stems) * number_flower_per_stem to get the actual number of flowers
+rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits |> 
+  mutate(number_flowers = case_when( species == "cennig" ~ number_flowers_per_stem*number_flowers_old,
+    # For all other cases, keep the original no flowers
+    .default = number_flowers_old
+  ))
+```
+
+##### Delete columns for calculation of no flowers
+
+```{r}
+rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits |>
+  select(-no_rep_stems, -sum_no_flowers, -number_flowers_per_stem, -number_flowers_old)
+```
+
+### Pivot longer the data
+
+```{r}
+rangex_phenology_clean_long <- rangex_phenology_clean |> 
+  pivot_longer(cols = c(number_buds, number_flowers, number_infructescences, seeds_collected),
+               names_to = "stage",
+               values_to = "value")
+
+# Arrange the dataframe if needed
+rangex_phenology_clean_long <- rangex_phenology_clean_long |> 
+  arrange(unique_plant_id, date)
+
+# View the resulting dataframe
+print(rangex_phenology_clean_long)
 ```
