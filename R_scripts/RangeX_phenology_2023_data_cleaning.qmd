@@ -320,7 +320,7 @@ rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits %>%
 
 ```
 
-##### Replace number_flowers with sum_no_flowers for cennig
+##### Replace number_flowers with number_flowers_per_stem for cennig
 
 ```{r}
 ## rename column number of flowers to old
@@ -329,7 +329,7 @@ rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits |>
 
 ## for cennig I want to have number_flowers_old (= no_stems) * number_flower_per_stem to get the actual number of flowers
 rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits |> 
-  mutate(number_flowers = case_when( species == "cennig" ~ number_flowers_per_stem*number_flowers_old,
+  mutate(number_flowers = case_when( species == "cennig"  & number_flowers_old != 0 ~ number_flowers_per_stem*number_flowers_old,
     # For all other cases, keep the original no flowers
     .default = number_flowers_old
   ))
@@ -345,15 +345,12 @@ rangex_phenology_clean_demo_traits <- rangex_phenology_clean_demo_traits |>
 ### Pivot longer the data
 
 ```{r}
-rangex_phenology_clean_long <- rangex_phenology_clean |> 
+rangex_phenology_clean_long <- rangex_phenology_clean_demo_traits |> 
   pivot_longer(cols = c(number_buds, number_flowers, number_infructescences, seeds_collected),
-               names_to = "stage",
+               names_to = "Stage",
                values_to = "value")
 
-# Arrange the dataframe if needed
+# Arrange the dataframe
 rangex_phenology_clean_long <- rangex_phenology_clean_long |> 
   arrange(unique_plant_id, date)
-
-# View the resulting dataframe
-print(rangex_phenology_clean_long)
 ```
